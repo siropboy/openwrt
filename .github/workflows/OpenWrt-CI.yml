@@ -9,8 +9,10 @@ on:
   repository_dispatch:
   release:
     types: published
-#  push:
-#    branches:
+  push:
+    branches: [ openwrt-18.06 ]
+pull_request:
+    branches: [ openwrt-18.06 ]
 #      - main
 #    paths:
 #      - 'all.config'
