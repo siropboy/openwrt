@@ -11,13 +11,13 @@ on:
     types: published
   push:
     branches: [ openwrt-18.06 ]
-pull_request:
+  pull_request:
     branches: [ openwrt-18.06 ]
 #      - main
 #    paths:
 #      - 'all.config'
-  schedule:
-    - cron: 0 22 */2 * * 
+#  schedule:
+#    - cron: 0 22 */2 * * 
   watch:
     types: started
 jobs:
