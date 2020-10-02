@@ -10,9 +10,9 @@ on:
   release:
     types: published
   push:
-    branches: [ openwrt-18.06 ]
+    branches: [ openwrt-18.06-dev ]
   pull_request:
-    branches: [ openwrt-18.06 ]
+    branches: [ openwrt-18.06-dev ]
 #      - main
 #    paths:
 #      - 'all.config'
@@ -33,7 +33,7 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v2 
         with:
-          ref: openwrt-18.06
+          ref: master
       - name: Space cleanup
         env:
           DEBIAN_FRONTEND: noninteractive
