@@ -14,6 +14,8 @@ function index()
 	entry({"admin", "services", "openclash", "status"},call("action_status")).leaf=true
 	entry({"admin", "services", "openclash", "state"},call("action_state")).leaf=true
 	entry({"admin", "services", "openclash", "startlog"},call("action_start")).leaf=true
+	entry({"admin", "services", "openclash", "refresh_log"},call("action_refresh_log"))
+	entry({"admin", "services", "openclash", "del_log"},call("action_del_log"))
 	entry({"admin", "services", "openclash", "close_all_connection"},call("action_close_all_connection"))
 	entry({"admin", "services", "openclash", "restore_history"},call("action_restore_history"))
 	entry({"admin", "services", "openclash", "get_history"},call("action_get_history"))
@@ -37,7 +39,8 @@ function index()
 	entry({"admin", "services", "openclash", "switch_mode"}, call("action_switch_mode"))
 	entry({"admin", "services", "openclash", "op_mode"}, call("action_op_mode"))
 	entry({"admin", "services", "openclash", "settings"},cbi("openclash/settings"),_("Global Settings"), 30).leaf = true
-	entry({"admin", "services", "openclash", "servers"},cbi("openclash/servers"),_("Severs and Groups"), 40).leaf = true
+	entry({"admin", "services", "openclash", "servers"},cbi("openclash/servers"),_("Servers and Groups"), 40).leaf = true
+	entry({"admin", "services", "openclash", "other-rules-edit"},cbi("openclash/other-rules-edit"), nil).leaf = true
 	entry({"admin", "services", "openclash", "rule-providers-settings"},cbi("openclash/rule-providers-settings"),_("Rule Providers and Groups"), 50).leaf = true
 	entry({"admin", "services", "openclash", "game-rules-manage"},form("openclash/game-rules-manage"), nil).leaf = true
 	entry({"admin", "services", "openclash", "rule-providers-manage"},form("openclash/rule-providers-manage"), nil).leaf = true
@@ -72,6 +75,10 @@ end
 
 local function is_web()
 	return luci.sys.call("pidof clash >/dev/null") == 0
+end
+
+local function restricted_mode()
+	return luci.sys.exec("uci get openclash.config.restricted_mode 2>/dev/null |tr -d '\n'")
 end
 
 local function is_watchdog()
@@ -306,6 +313,7 @@ function action_status()
 		uh_port = uh_port(),
 		web = is_web(),
 		cn_port = cn_port(),
+		restricted_mode = restricted_mode(),
 		mode = mode();
 	})
 end
@@ -437,4 +445,23 @@ function action_download_rule()
 	luci.http.write_json({
 		rule_download_status = download_rule();
 	})
+end
+
+function action_refresh_log()
+	local logfile="/tmp/openclash.log"
+	if not fs.access(logfile) then
+		luci.http.write("")
+		return
+	end
+	luci.http.prepare_content("text/plain; charset=utf-8")
+	local f=io.open(logfile, "r+")
+	f:seek("set")
+	local a=f:read(2048000) or ""
+	f:close()
+	luci.http.write(a)
+end
+
+function action_del_log()
+	luci.sys.exec("echo '' > /tmp/openclash.log")
+	return
 end

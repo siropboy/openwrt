@@ -219,6 +219,7 @@ o.default = "none"
 o:value("none")
 o:value("websocket", translate("websocket (ws)"))
 o:value("http", translate("http"))
+o:value("h2", translate("h2"))
 o:depends("type", "vmess")
 
 o = s:option(Value, "host", translate("obfs-hosts"))
@@ -235,6 +236,16 @@ o = s:option(Value, "path", translate("path"))
 o.rmempty = true
 o:depends("obfs", "websocket")
 o:depends("obfs_vmess", "websocket")
+
+o = s:option(DynamicList, "h2_host", translate("host"))
+o.rmempty = true
+o.datatype = "host"
+o:depends("obfs_vmess", "h2")
+
+o = s:option(Value, "h2_path", translate("path"))
+o.rmempty = true
+o.default = "/"
+o:depends("obfs_vmess", "h2")
 
 o = s:option(DynamicList, "http_path", translate("path"))
 o.rmempty = true
@@ -261,7 +272,7 @@ o:depends("type", "http")
 o:depends("type", "trojan")
 
 -- [[ TLS ]]--
-o = s:option(ListValue, "tls", translate("TLS"))
+o = s:option(ListValue, "tls", translate("tls"))
 o.rmempty = true
 o.default = "false"
 o:value("true")
@@ -273,8 +284,9 @@ o:depends("obfs_vmess", "http")
 o:depends("type", "socks5")
 o:depends("type", "http")
 
-o = s:option(Value, "servername", translate("TLS Custom Host"))
+o = s:option(Value, "servername", translate("sni"))
 o.rmempty = true
+o.datatype = "host"
 o.placeholder = translate("example.com")
 o:depends("obfs_vmess", "websocket")
 
@@ -284,18 +296,6 @@ o.default = "true"
 o:value("true")
 o:value("false")
 o:depends("obfs_vmess", "http")
-
--- 验证用户名
-o = s:option(Value, "auth_name", translate("Auth Username"))
-o:depends("type", "socks5")
-o:depends("type", "http")
-o.rmempty = true
-
--- 验证密码
-o = s:option(Value, "auth_pass", translate("Auth Password"))
-o:depends("type", "socks5")
-o:depends("type", "http")
-o.rmempty = true
 
 -- [[ MUX ]]--
 o = s:option(ListValue, "mux", translate("mux"))
@@ -311,6 +311,19 @@ o.datatype = "host"
 o.placeholder = translate("example.com")
 o.rmempty = true
 o:depends("type", "trojan")
+o:depends("type", "http")
+
+-- 验证用户名
+o = s:option(Value, "auth_name", translate("Auth Username"))
+o:depends("type", "socks5")
+o:depends("type", "http")
+o.rmempty = true
+
+-- 验证密码
+o = s:option(Value, "auth_pass", translate("Auth Password"))
+o:depends("type", "socks5")
+o:depends("type", "http")
+o.rmempty = true
 
 -- [[ alpn ]]--
 o = s:option(DynamicList, "alpn", translate("alpn"))

@@ -7,12 +7,13 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=annie
-PKG_VERSION:=0.10.3-67298d5
+PKG_VERSION:=0.10.3-abc3c9d
 PKG_RELEASE:=1
 
 PKG_SOURCE_PROTO:=git
+PKG_SOURCE_DATE:=2020-12-15
 PKG_SOURCE_URL:=https://github.com/iawia002/annie.git
-PKG_SOURCE_VERSION:=67298d55aaf43d840b8d7283b0ac99736173d285
+PKG_SOURCE_VERSION:=abc3c9df18173c91a5ca7a77fecc0665dea01aa1
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION)-$(PKG_SOURCE_VERSION).tar.gz
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(PKG_VERSION)-$(PKG_SOURCE_VERSION)
 
@@ -58,7 +59,7 @@ endef
 
 ifeq ($(CONFIG_ANNIE_COMPRESS_GOPROXY),y)
 	export GO111MODULE=on
-	export GOPROXY=https://goproxy.cn
+	export GOPROXY=https://goproxy.io
 endif
 
 define Build/Prepare

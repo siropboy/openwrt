@@ -1,6 +1,7 @@
 #!/bin/bash
 . /lib/functions.sh
 . /usr/share/openclash/openclash_ps.sh
+. /usr/share/openclash/ruby.sh
 
 status=$(unify_ps_status "openclash.sh")
 [ "$status" -gt 3 ] && exit 0
@@ -16,6 +17,7 @@ dns_port=$(uci get openclash.config.dns_port 2>/dev/null)
 enable_redirect_dns=$(uci get openclash.config.enable_redirect_dns 2>/dev/null)
 disable_masq_cache=$(uci get openclash.config.disable_masq_cache 2>/dev/null)
 if_restart=0
+only_download=0
 
 urlencode() {
    local data
@@ -28,7 +30,6 @@ urlencode() {
 }
 
 kill_watchdog() {
-
    watchdog_pids=$(unify_ps_pids "openclash_watchdog.sh")
    for watchdog_pid in $watchdog_pids; do
       kill -9 "$watchdog_pid" >/dev/null 2>&1
@@ -56,7 +57,7 @@ config_cus_up()
 	fi
 	if [ -z "$subscribe_url_param" ]; then
 	   if [ "$servers_update" -eq 1 ] || [ ! -z "$keyword" ] || [ ! -z "$ex_keyword" ]; then
-	      echo "配置文件【$name】替换成功，开始挑选节点..." >$START_LOG
+	      echo "配置文件【$name】替换成功，开始挑选节点..." > $START_LOG
 	      uci set openclash.config.config_update_path="/etc/openclash/config/$name.yaml"
 	      uci set openclash.config.servers_if_update=1
 	      uci commit openclash
@@ -67,30 +68,30 @@ config_cus_up()
 	      if [ "$CONFIG_FILE" == "$CONFIG_PATH" ]; then
 	         if_restart=1
 	      fi
-	      echo "${LOGTIME} Config 【$name】 Update Successful" >>$LOG_FILE
-	      echo "配置文件【$name】更新成功！" >$START_LOG
+	      echo "${LOGTIME} Config 【$name】 Update Successful" >> $LOG_FILE
+	      echo "配置文件【$name】更新成功！" > $START_LOG
 	      sleep 3
-	      echo "" >$START_LOG
+	      echo "" > $START_LOG
 	   elif [ "$CONFIG_FILE" == "$CONFIG_PATH" ]; then
-        echo "${LOGTIME} Config 【$name】 Update Successful" >>$LOG_FILE
-        echo "配置文件【$name】更新成功！" >$START_LOG
+        echo "${LOGTIME} Config 【$name】 Update Successful" >> $LOG_FILE
+        echo "配置文件【$name】更新成功！" > $START_LOG
         sleep 3
         if_restart=1
      else
-        echo "配置文件【$name】更新成功！" >$START_LOG
-        echo "${LOGTIME} Config 【$name】 Update Successful" >>$LOG_FILE
+        echo "配置文件【$name】更新成功！" > $START_LOG
+        echo "${LOGTIME} Config 【$name】 Update Successful" >> $LOG_FILE
         sleep 3
-        echo "" >$START_LOG
+        echo "" > $START_LOG
      fi
   else
      if [ "$CONFIG_FILE" == "$CONFIG_PATH" ]; then
-        echo "${LOGTIME} Config 【$name】 Update Successful" >>$LOG_FILE
-        echo "配置文件【$name】更新成功！" >$START_LOG
+        echo "${LOGTIME} Config 【$name】 Update Successful" >> $LOG_FILE
+        echo "配置文件【$name】更新成功！" > $START_LOG
         sleep 3
         if_restart=1
      else
-        echo "配置文件【$name】更新成功！" >$START_LOG
-        echo "${LOGTIME} Config 【$name】 Update Successful" >>$LOG_FILE
+        echo "配置文件【$name】更新成功！" > $START_LOG
+        echo "${LOGTIME} Config 【$name】 Update Successful" >> $LOG_FILE
         sleep 3
         echo "" >$START_LOG
      fi
@@ -101,42 +102,51 @@ config_cus_up()
 
 config_su_check()
 {
-   echo "配置文件下载成功，检查是否有更新..." >$START_LOG
+   echo "配置文件下载成功，检查是否有更新..." > $START_LOG
    sed -i 's/!<str> //g' "$CFG_FILE" >/dev/null 2>&1
    if [ -f "$CONFIG_FILE" ]; then
       cmp -s "$BACKPACK_FILE" "$CFG_FILE"
       if [ "$?" -ne 0 ]; then
-         echo "配置文件【$name】有更新，开始替换..." >$START_LOG
+         echo "配置文件【$name】有更新，开始替换..." > $START_LOG
          mv "$CFG_FILE" "$CONFIG_FILE" 2>/dev/null
          cp "$CONFIG_FILE" "$BACKPACK_FILE"
-         config_cus_up
+         if [ "$only_download" -eq 0 ]; then
+            config_cus_up
+         else
+            echo "配置文件【$name】更新成功！" > $START_LOG
+            echo "${LOGTIME} Config 【$name】 Update Successful" >> $LOG_FILE
+            sleep 3
+            echo "" > $START_LOG
+         fi
       else
-         echo "配置文件【$name】没有任何更新，停止继续操作..." >$START_LOG
+         echo "配置文件【$name】没有任何更新，停止继续操作..." > $START_LOG
          rm -rf "$CFG_FILE"
-         echo "${LOGTIME} Updated Config【$name】 No Change, Do Nothing" >>$LOG_FILE
+         echo "${LOGTIME} Updated Config【$name】 No Change, Do Nothing" >> $LOG_FILE
          sleep 5
-         echo "" >$START_LOG
+         echo "" > $START_LOG
       fi
    else
-      echo "配置文件下载成功，本地没有配置文件，开始创建 ..." >$START_LOG
+      echo "配置文件下载成功，本地没有配置文件，开始创建 ..." > $START_LOG
       mv "$CFG_FILE" "$CONFIG_FILE" 2>/dev/null
       cp "$CONFIG_FILE" "$BACKPACK_FILE"
-      config_cus_up
+      if [ "$only_download" -eq 0 ]; then
+         config_cus_up
+      else
+         echo "配置文件【$name】更新成功！" >$START_LOG
+         echo "${LOGTIME} Config 【$name】 Update Successful" >> $LOG_FILE
+         sleep 3
+         echo "" > $START_LOG
+      fi
    fi
-}
-
-config_encode()
-{
-   /usr/share/openclash/yml_field_name_ch.sh "$CFG_FILE"
 }
 
 config_error()
 {
-   echo "配置文件【$name】下载失败，请检查网络或稍后再试！" >$START_LOG
-   echo "${LOGTIME} Config 【$name】Update Error" >>$LOG_FILE
+   echo "配置文件【$name】下载失败，请检查网络或稍后再试！" > $START_LOG
+   echo "${LOGTIME} Error: Config 【$name】Update Error" >> $LOG_FILE
    rm -rf "$CFG_FILE" 2>/dev/null
    sleep 5
-   echo "" >$START_LOG
+   echo "" > $START_LOG
 }
 
 change_dns()
@@ -153,6 +163,8 @@ change_dns()
          uci commit dhcp
          /etc/init.d/dnsmasq restart >/dev/null 2>&1
       fi
+      iptables -t nat -I OUTPUT -j openclash_output >/dev/null 2>&1
+      iptables -t mangle -I OUTPUT -j openclash_output >/dev/null 2>&1
       nohup /usr/share/openclash/openclash_watchdog.sh &
    fi
 }
@@ -160,23 +172,64 @@ change_dns()
 config_download_direct()
 {
    if pidof clash >/dev/null; then
-      echo "配置文件【$name】下载失败，尝试不使用代理下载配置文件..." >$START_LOG
       
       kill_watchdog
 
       uci del_list dhcp.@dnsmasq[0].server=127.0.0.1#"$dns_port" >/dev/null 2>&1
-      uci set dhcp.@dnsmasq[0].resolvfile=/tmp/resolv.conf.auto >/dev/null 2>&1
+      if [ -s "/tmp/resolv.conf.d/resolv.conf.auto" ] && [ -n "$(grep "nameserver" /tmp/resolv.conf.d/resolv.conf.auto)" ]; then
+         uci set dhcp.@dnsmasq[0].resolvfile=/tmp/resolv.conf.d/resolv.conf.auto >/dev/null 2>&1
+      elif [ -s "/tmp/resolv.conf.auto" ] && [ -n "$(grep "nameserver" /tmp/resolv.conf.auto)" ]; then
+         uci set dhcp.@dnsmasq[0].resolvfile=/tmp/resolv.conf.auto >/dev/null 2>&1
+      else
+         rm -rf /tmp/resolv.conf.auto 2>/dev/null
+         touch /tmp/resolv.conf.auto 2>/dev/null
+         cat >> "/tmp/resolv.conf.auto" <<-EOF
+# Interface lan
+nameserver 114.114.114.114
+nameserver 119.29.29.29
+EOF
+         uci set dhcp.@dnsmasq[0].resolvfile=/tmp/resolv.conf.auto >/dev/null 2>&1
+      fi
       uci set dhcp.@dnsmasq[0].noresolv=0 >/dev/null 2>&1
       uci delete dhcp.@dnsmasq[0].cachesize >/dev/null 2>&1
       uci commit dhcp
       /etc/init.d/dnsmasq restart >/dev/null 2>&1
+      
+      iptables -t nat -D OUTPUT -j openclash_output >/dev/null 2>&1
+      iptables -t mangle -D OUTPUT -j openclash_output >/dev/null 2>&1
       sleep 3
 
       config_download
       
       if [ "$?" -eq 0 ] && [ -s "$CFG_FILE" ]; then
-      	 change_dns
-         config_su_check
+         ruby -ryaml -E UTF-8 -e "
+         begin
+         YAML.load_file('$CFG_FILE');
+         rescue Exception => e
+         puts '${LOGTIME} Error: Unable To Parse Config File ' + e.message
+         system 'rm -rf ${CFG_FILE} 2>/dev/null'
+         end
+         " 2>/dev/null >> $LOG_FILE
+         if [ $? -ne 0 ]; then
+            echo "${LOGTIME} Error: Ruby Works Abnormally, Please Check The Ruby Library Depends!" >> $LOG_FILE
+            echo "Ruby依赖异常，无法校验配置文件，请确认ruby依赖工作正常后重试！" > $START_LOG
+            sleep 3
+            only_download=1
+            change_dns
+            config_su_check
+         elif [ ! -f "$CFG_FILE" ]; then
+            echo "配置文件格式校验失败..." > $START_LOG
+            sleep 3
+            config_error
+         elif ! "$(ruby_read "$CFG_FILE" ".key?('proxies')")" && ! "$(ruby_read "$CFG_FILE" ".key?('proxy-providers')")" ; then
+            echo "${LOGTIME} Error: Updated Config 【$name】 Has No Proxy Field, Update Exit..." >> $LOG_FILE
+            echo "配置文件节点部分校验失败..." > $START_LOG
+            sleep 3
+            config_error
+         else
+            change_dns
+            config_su_check
+         fi
       else
          change_dns
          config_error
@@ -285,26 +338,40 @@ sub_info_get()
       subscribe_url=$address
    fi
 
-   echo "开始更新配置文件【$name】..." >$START_LOG
+   echo "开始更新配置文件【$name】..." > $START_LOG
 
    config_download
 
    if [ "$?" -eq 0 ] && [ -s "$CFG_FILE" ]; then
-   	  config_encode
-   	  if [ -n "$(grep "^ \{0,\}proxy-groups:" "$CFG_FILE")" ]; then
-         if [ -n "$(grep "^ \{0,\}Proxy:" "$CFG_FILE" 2>/dev/null)" ] || [ -n "$(grep "^ \{0,\}proxy-providers:" "$CFG_FILE" 2>/dev/null)" ]; then
-            if [ -n "$(grep "^ \{0,\}rules:" "$CFG_FILE" 2>/dev/null)" ] || [ -n "$(grep "^ \{0,\}script:" "$CFG_FILE" 2>/dev/null)" ]; then
-               config_su_check
-            else
-               config_download_direct
-            fi
-         else
-            config_download_direct
-         fi
-      else
+   	  ruby -ryaml -E UTF-8 -e "
+      begin
+      YAML.load_file('$CFG_FILE');
+      rescue Exception => e
+      puts '${LOGTIME} Error: Unable To Parse Config File ' + e.message
+      system 'rm -rf ${CFG_FILE} 2>/dev/null'
+      end
+      " 2>/dev/null >> $LOG_FILE
+      if [ $? -ne 0 ]; then
+         echo "${LOGTIME} Error: Ruby Works Abnormally, Please Check The Ruby Library Depends!" >> $LOG_FILE
+         echo "Ruby依赖异常，无法校验配置文件，请确认ruby依赖工作正常后重试！" > $START_LOG
+         sleep 3
+         only_download=1
+         config_su_check
+      elif [ ! -f "$CFG_FILE" ]; then
+         echo "配置文件格式校验失败，尝试不使用代理下载配置文件..." > $START_LOG
+         sleep 3
          config_download_direct
+      elif ! "$(ruby_read "$CFG_FILE" ".key?('proxies')")" && ! "$(ruby_read "$CFG_FILE" ".key?('proxy-providers')")" ; then
+         echo "${LOGTIME} Error: Updated Config 【$name】 Has No Proxy Field" >> $LOG_FILE
+         echo "配置文件节点部分校验失败，尝试不使用代理下载配置文件..." > $START_LOG
+         sleep 3
+         config_download_direct
+      else
+         config_su_check
       fi
    else
+      echo "配置文件【$name】订阅失败，尝试不使用代理下载配置文件..." > $START_LOG
+      echo "${LOGTIME} Error: Config 【$name】 Download Faild" >> $LOG_FILE
       config_download_direct
    fi
 }
@@ -316,7 +383,7 @@ uci delete openclash.config.config_update_path >/dev/null 2>&1
 uci commit openclash
 
 if [ "$if_restart" -eq 1 ]; then
-   /etc/init.d/openclash restart >/dev/null 2>&1
+   /etc/init.d/openclash restart >/dev/null 2>&1 &
 else
    sed -i '/openclash.sh/d' $CRON_FILE 2>/dev/null
    [ "$(uci get openclash.config.auto_update 2>/dev/null)" -eq 1 ] && [ "$(uci get openclash.config.config_auto_update_mode 2>/dev/null)" -ne 1 ] && echo "0 $(uci get openclash.config.auto_update_time 2>/dev/null) * * $(uci get openclash.config.config_update_week_time 2>/dev/null) /usr/share/openclash/openclash.sh" >> $CRON_FILE

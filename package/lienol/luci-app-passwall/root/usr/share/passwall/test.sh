@@ -67,17 +67,15 @@ test_auto_switch() {
 	fi
 
 	status=$(test_proxy)
-	if [ "$status" == 0 ]; then
-		echolog "自动切换检测：${type}_${index}节点正常。"
-		return 0
-	elif [ "$status" == 2 ]; then
+	if [ "$status" == 2 ]; then
 		echolog "自动切换检测：无法连接到网络，请检查网络是否正常！"
 		return 2
-	elif [ "$status" == 1 ]; then
-		echolog "自动切换检测：${type}_${index}节点异常，开始切换节点！"
-		
+	fi
+	
+	local restore_switch=$(config_t_get auto_switch restore_switch${index} 0)
+	if [ "$restore_switch" == "1" ]; then
 		#检测主节点是否能使用
-		local main_node=$(config_t_get auto_switch tcp_main1)
+		local main_node=$(config_t_get auto_switch tcp_main${index})
 		if [ "$now_node" != "$main_node" ]; then
 			local node_type=$(echo $(config_n_get $main_node type) | tr 'A-Z' 'a-z')
 			if [ "$node_type" == "socks" ]; then
@@ -89,6 +87,7 @@ test_auto_switch() {
 				/usr/share/passwall/app.sh run_socks "$main_node" "127.0.0.1" "$tmp_port" "/var/etc/passwall/auto_switch_$index.json" "10"
 				local curlx="socks5h://127.0.0.1:$tmp_port"
 			fi
+			sleep 10s
 			proxy_status=$(test_url "https://www.google.com/generate_204" 3 3 "-x $curlx")
 			ps -w | grep -v "grep" | grep "/var/etc/passwall/auto_switch_$index.json" | awk '{print $1}' | xargs kill -9 >/dev/null 2>&1
 			if [ "$proxy_status" -eq 200 ]; then
@@ -98,7 +97,13 @@ test_auto_switch() {
 				return 0
 			fi
 		fi
-		
+	fi
+	
+	if [ "$status" == 0 ]; then
+		echolog "自动切换检测：${type}_${index}节点$(config_n_get $now_node type) $(config_n_get $now_node address) $(config_n_get $now_node port)正常。"
+		return 0
+	elif [ "$status" == 1 ]; then
+		echolog "自动切换检测：${type}_${index}节点异常，开始切换节点！"
 		local new_node
 		in_backup_nodes=$(echo $b_tcp_nodes | grep $now_node)
 		# 判断当前节点是否存在于备用节点列表里
@@ -131,32 +136,27 @@ test_auto_switch() {
 }
 
 start() {
-	(
-		flock -xn 200
-		[ "$?" != "0" ] && exit 0
-		
-		ENABLED=$(config_t_get global enabled 0)
-		[ "$ENABLED" != 1 ] && return 1
-		ENABLED=$(config_t_get auto_switch enable 0)
-		[ "$ENABLED" != 1 ] && return 1
+	ENABLED=$(config_t_get global enabled 0)
+	[ "$ENABLED" != 1 ] && _return 1
+	ENABLED=$(config_t_get auto_switch enable 0)
+	[ "$ENABLED" != 1 ] && _return 1
+	delay=$(config_t_get auto_switch testing_time 1)
+	sleep ${delay}m
+	while [ "$ENABLED" -eq 1 ]
+	do
+		# TCP_NODE_NUM=$(config_t_get global_other tcp_node_num 1)
+		# 暂时只能检测TCP1
+		TCP_NODE_NUM=1
+		for i in $(seq 1 $TCP_NODE_NUM); do
+			eval TCP_NODE$i=\"$(config_t_get auto_switch tcp_node$i nil)\"
+			eval tmp=\$TCP_NODE$i
+			[ -n "$tmp" -a "$tmp" != "nil" ] && {
+				test_auto_switch TCP tcp $i "$tmp"
+			}
+		done
 		delay=$(config_t_get auto_switch testing_time 1)
 		sleep ${delay}m
-		while [ "$ENABLED" -eq 1 ]
-		do
-			# TCP_NODE_NUM=$(config_t_get global_other tcp_node_num 1)
-			# 暂时只能检测TCP1
-			TCP_NODE_NUM=1
-			for i in $(seq 1 $TCP_NODE_NUM); do
-				eval TCP_NODE$i=\"$(config_t_get auto_switch tcp_node$i nil)\"
-				eval tmp=\$TCP_NODE$i
-				[ -n "$tmp" -a "$tmp" != "nil" ] && {
-					test_auto_switch TCP tcp $i "$tmp"
-				}
-			done
-			delay=$(config_t_get auto_switch testing_time 1)
-			sleep ${delay}m
-		done
-	) 200>"/var/lock/passwall_auto_switch.lock"
+	done
 }
 
 case $1 in

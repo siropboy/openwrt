@@ -445,6 +445,18 @@ define Device/jcg_jhr-ac876m
 endef
 TARGET_DEVICES += jcg_jhr-ac876m
 
+define Device/jcg_y2
+  IMAGE_SIZE := 16064k
+  IMAGES += factory.bin
+  IMAGE/factory.bin := $$(sysupgrade_bin) | check-size | \
+	jcg-header 95.1
+  JCG_MAXSIZE := 16064k
+  DEVICE_VENDOR := JCG
+  DEVICE_MODEL := Y2
+  DEVICE_PACKAGES := kmod-usb3 luci-app-mtwifi
+endef
+TARGET_DEVICES += jcg_y2
+
 define Device/jdcloud_re-sp-01b
   IMAGE_SIZE := 27328k
   DEVICE_VENDOR := JDCloud
@@ -941,11 +953,14 @@ define Device/xiaomi-ac2100
   KERNEL_SIZE := 4096k
   IMAGE_SIZE := 120320k
   UBINIZE_OPTS := -E 5
-  IMAGES += kernel1.bin rootfs0.bin factory.bin
+  IMAGES += kernel1.bin rootfs0.bin factory.bin breed-factory.bin
   IMAGE/kernel1.bin := append-kernel
   IMAGE/rootfs0.bin := append-ubi | check-size
   IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata
   IMAGE/factory.bin := append-kernel | pad-to $$(KERNEL_SIZE) | append-ubi | check-size
+  IMAGE/breed-factory.bin := append-kernel | pad-to $$(KERNEL_SIZE) | \
+			     append-kernel | pad-to $$(KERNEL_SIZE) | \
+			     append-ubi | check-size
   DEVICE_VENDOR := Xiaomi
   DEVICE_PACKAGES := kmod-mt7603 kmod-mt7615e wpad-openssl uboot-envtools
 endef

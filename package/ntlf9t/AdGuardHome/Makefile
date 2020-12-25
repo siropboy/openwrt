@@ -7,13 +7,13 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=AdGuardHome
-PKG_VERSION:=0.103.3
+PKG_VERSION:=0.104.3
 PKG_RELEASE:=1
 
 PKG_SOURCE_PROTO:=git
 PKG_SOURCE_VERSION:=v$(PKG_VERSION)
 PKG_SOURCE_URL:=https://github.com/AdguardTeam/AdGuardHome
-PKG_MIRROR_HASH:=11ffc493604c10c6c22c973bc69e5697738c12b05219dd123597cadfd174d2af
+PKG_MIRROR_HASH:=ec0d48413778267f4ac81091e58a88e5b5ee2f3c1ab48256ded3438bf171d311
 
 PKG_LICENSE:=GPL-3.0-only
 PKG_LICENSE_FILES:=LICENSE.txt
@@ -28,7 +28,7 @@ PKG_CONFIG_DEPENDS:= \
 	CONFIG_ADGUARDHOME_COMPRESS_UPX
 
 GO_PKG:=github.com/AdguardTeam/AdGuardHome
-GO_PKG_EXCLUDES:=dhcpd/standalone
+GO_PKG_EXCLUDES:=internal/dhcpd/standalone
 GO_PKG_LDFLAGS:=-s -w
 GO_PKG_LDFLAGS_X:=main.version=$(PKG_VERSION) main.channel=release
 
@@ -59,7 +59,7 @@ endef
 
 ifeq ($(CONFIG_ADGUARDHOME_COMPRESS_GOPROXY),y)
 export GO111MODULE=on
-export GOPROXY=https://goproxy.cn
+export GOPROXY=https://goproxy.io
 endif
 
 define Build/Compile
@@ -68,7 +68,7 @@ define Build/Compile
   npm --prefix client ci ; \
   npm --prefix client run build-prod ; \
   GOOS=$$$$(go env GOOS) GOARCH=$$$$(go env GOARCH) GO111MODULE=off go get -v github.com/gobuffalo/packr/... ; \
-  "$$$$(go env GOPATH)/bin/packr" -v -z -i $(PKG_BUILD_DIR)/home ; \
+  "$$$$(go env GOPATH)/bin/packr" -v -z -i $(PKG_BUILD_DIR)/internal/home ; \
   $(call GoPackage/Build/Compile) ; \
 )
 ifeq ($(CONFIG_ADGUARDHOME_COMPRESS_UPX),y)

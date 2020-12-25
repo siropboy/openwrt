@@ -79,6 +79,10 @@ end
 if api.is_finded("ssr-redir") then
     type:value("SSR", translate("ShadowsocksR"))
 end
+if api.is_finded("xray") then
+    type:value("Xray", translate("Xray"))
+    type.description = translate("Xray is currently directly compatible with V2ray and used.")
+end
 if api.is_finded("v2ray") then
     type:value("V2ray", translate("V2ray"))
 end
@@ -106,21 +110,21 @@ protocol:value("vless", translate("VLESS"))
 protocol:value("http", translate("HTTP"))
 protocol:value("socks", translate("Socks"))
 protocol:value("shadowsocks", translate("Shadowsocks"))
+protocol:value("trojan", translate("Trojan"))
 protocol:value("_balancing", translate("Balancing"))
 protocol:value("_shunt", translate("Shunt"))
 protocol:depends("type", "V2ray")
+protocol:depends("type", "Xray")
 
 local nodes_table = {}
-uci:foreach(appname, "nodes", function(e)
-    if e.type and e.remarks and e.port then
-        if e.address:match("[\u4e00-\u9fa5]") and e.address:find("%.") and e.address:sub(#e.address) ~= "." then
-            nodes_table[#nodes_table + 1] = {
-                id = e[".name"],
-                remarks = "%s：[%s] %s:%s" % {e.type, e.remarks, e.address, e.port}
-            }
-        end
+for k, e in ipairs(api.get_valid_nodes()) do
+    if e.node_type == "normal" then
+        nodes_table[#nodes_table + 1] = {
+            id = e[".name"],
+            remarks = e.remarks_name
+        }
     end
-end)
+end
 
 -- 负载均衡列表
 balancing_node = s:option(DynamicList, "balancing_node", translate("Load balancing node list"), translate("Load balancing node list, <a target='_blank' href='https://toutyrater.github.io/routing/balance2.html'>document</a>"))
@@ -129,7 +133,7 @@ balancing_node:depends("protocol", "_balancing")
 
 -- 分流
 uci:foreach(appname, "shunt_rules", function(e)
-    o = s:option(ListValue, e[".name"], translate(e.remarks))
+    o = s:option(ListValue, e[".name"], '<a href="../shunt_rules/' .. e[".name"] .. '">' .. translate(e.remarks) .. "</a>")
     o:value("nil", translate("Close"))
     for k, v in pairs(nodes_table) do o:value(v.id, v.remarks) end
     o:depends("protocol", "_shunt")
@@ -139,10 +143,28 @@ uci:foreach(appname, "shunt_rules", function(e)
     o:depends("protocol", "_shunt")
 end)
 
+shunt_tips = s:option(DummyValue, "shunt_tips", " ")
+shunt_tips.rawhtml = true
+shunt_tips.cfgvalue = function(t, n)
+    return string.format('<a style="color: red" href="../rule">%s</a>', translate("No shunt rules? Click me to go to add."))
+end
+shunt_tips:depends("protocol", "_shunt")
+
 default_node = s:option(ListValue, "default_node", translate("Default") .. " " .. translate("Node"))
 default_node:value("nil", translate("Close"))
 for k, v in pairs(nodes_table) do default_node:value(v.id, v.remarks) end
 default_node:depends("protocol", "_shunt")
+
+domainStrategy = s:option(ListValue, "domainStrategy", translate("Domain Strategy"))
+domainStrategy:value("AsIs")
+domainStrategy:value("IPIfNonMatch")
+domainStrategy:value("IPOnDemand")
+domainStrategy.description = "<br /><ul><li>" .. translate("'AsIs': Only use domain for routing. Default value.")
+.. "</li><li>" .. translate("'IPIfNonMatch': When no rule matches current domain, resolves it into IP addresses (A or AAAA records) and try all rules again.")
+.. "</li><li>" .. translate("'IPOnDemand': As long as there is a IP-based rule, resolves the domain into IP immediately.")
+.. "</li></ul>"
+domainStrategy:depends("protocol", "_balancing")
+domainStrategy:depends("protocol", "_shunt")
 
 -- Brook协议
 brook_protocol = s:option(ListValue, "brook_protocol", translate("Protocol"))
@@ -176,16 +198,23 @@ address.rmempty = false
 address:depends("type", "Socks")
 address:depends("type", "SS")
 address:depends("type", "SSR")
-address:depends({ type = "V2ray", protocol = "vmess" })
-address:depends({ type = "V2ray", protocol = "vless" })
-address:depends({ type = "V2ray", protocol = "http" })
-address:depends({ type = "V2ray", protocol = "socks" })
-address:depends({ type = "V2ray", protocol = "shadowsocks" })
 address:depends("type", "Brook")
 address:depends("type", "Trojan")
 address:depends("type", "Trojan-Plus")
 address:depends("type", "Trojan-Go")
 address:depends("type", "Naiveproxy")
+address:depends({ type = "Xray", protocol = "vmess" })
+address:depends({ type = "Xray", protocol = "vless" })
+address:depends({ type = "Xray", protocol = "http" })
+address:depends({ type = "Xray", protocol = "socks" })
+address:depends({ type = "Xray", protocol = "shadowsocks" })
+address:depends({ type = "Xray", protocol = "trojan" })
+address:depends({ type = "V2ray", protocol = "vmess" })
+address:depends({ type = "V2ray", protocol = "vless" })
+address:depends({ type = "V2ray", protocol = "http" })
+address:depends({ type = "V2ray", protocol = "socks" })
+address:depends({ type = "V2ray", protocol = "shadowsocks" })
+address:depends({ type = "V2ray", protocol = "trojan" })
 
 --[[
 use_ipv6 = s:option(Flag, "use_ipv6", translate("Use IPv6"))
@@ -193,15 +222,22 @@ use_ipv6.default = 0
 use_ipv6:depends("type", "Socks")
 use_ipv6:depends("type", "SS")
 use_ipv6:depends("type", "SSR")
+use_ipv6:depends("type", "Brook")
+use_ipv6:depends("type", "Trojan")
+use_ipv6:depends("type", "Trojan-Plus")
+use_ipv6:depends("type", "Trojan-Go")
+use_ipv6:depends({ type = "Xray", protocol = "vmess" })
+use_ipv6:depends({ type = "Xray", protocol = "vless" })
+use_ipv6:depends({ type = "Xray", protocol = "http" })
+use_ipv6:depends({ type = "Xray", protocol = "socks" })
+use_ipv6:depends({ type = "Xray", protocol = "shadowsocks" })
+use_ipv6:depends({ type = "Xray", protocol = "trojan" })
 use_ipv6:depends({ type = "V2ray", protocol = "vmess" })
 use_ipv6:depends({ type = "V2ray", protocol = "vless" })
 use_ipv6:depends({ type = "V2ray", protocol = "http" })
 use_ipv6:depends({ type = "V2ray", protocol = "socks" })
 use_ipv6:depends({ type = "V2ray", protocol = "shadowsocks" })
-use_ipv6:depends("type", "Brook")
-use_ipv6:depends("type", "Trojan")
-use_ipv6:depends("type", "Trojan-Plus")
-use_ipv6:depends("type", "Trojan-Go")
+use_ipv6:depends({ type = "V2ray", protocol = "trojan" })
 --]]
 
 port = s:option(Value, "port", translate("Port"))
@@ -210,22 +246,31 @@ port.rmempty = false
 port:depends("type", "Socks")
 port:depends("type", "SS")
 port:depends("type", "SSR")
-port:depends({ type = "V2ray", protocol = "vmess" })
-port:depends({ type = "V2ray", protocol = "vless" })
-port:depends({ type = "V2ray", protocol = "http" })
-port:depends({ type = "V2ray", protocol = "socks" })
-port:depends({ type = "V2ray", protocol = "shadowsocks" })
 port:depends("type", "Brook")
 port:depends("type", "Trojan")
 port:depends("type", "Trojan-Plus")
 port:depends("type", "Trojan-Go")
 port:depends("type", "Naiveproxy")
+port:depends({ type = "Xray", protocol = "vmess" })
+port:depends({ type = "Xray", protocol = "vless" })
+port:depends({ type = "Xray", protocol = "http" })
+port:depends({ type = "Xray", protocol = "socks" })
+port:depends({ type = "Xray", protocol = "shadowsocks" })
+port:depends({ type = "Xray", protocol = "trojan" })
+port:depends({ type = "V2ray", protocol = "vmess" })
+port:depends({ type = "V2ray", protocol = "vless" })
+port:depends({ type = "V2ray", protocol = "http" })
+port:depends({ type = "V2ray", protocol = "socks" })
+port:depends({ type = "V2ray", protocol = "shadowsocks" })
+port:depends({ type = "V2ray", protocol = "trojan" })
 
 username = s:option(Value, "username", translate("Username"))
 username:depends("type", "Socks")
 username:depends("type", "Naiveproxy")
-username:depends("protocol", "http")
-username:depends("protocol", "socks")
+username:depends({ type = "Xray", protocol = "http" })
+username:depends({ type = "Xray", protocol = "socks" })
+username:depends({ type = "V2ray", protocol = "http" })
+username:depends({ type = "V2ray", protocol = "socks" })
 
 password = s:option(Value, "password", translate("Password"))
 password.password = true
@@ -237,9 +282,14 @@ password:depends("type", "Trojan")
 password:depends("type", "Trojan-Plus")
 password:depends("type", "Trojan-Go")
 password:depends("type", "Naiveproxy")
-password:depends("protocol", "http")
-password:depends("protocol", "socks")
-password:depends("protocol", "shadowsocks")
+password:depends({ type = "Xray", protocol = "http" })
+password:depends({ type = "Xray", protocol = "socks" })
+password:depends({ type = "Xray", protocol = "shadowsocks" })
+password:depends({ type = "Xray", protocol = "trojan" })
+password:depends({ type = "V2ray", protocol = "http" })
+password:depends({ type = "V2ray", protocol = "socks" })
+password:depends({ type = "V2ray", protocol = "shadowsocks" })
+password:depends({ type = "V2ray", protocol = "trojan" })
 
 ss_encrypt_method = s:option(ListValue, "ss_encrypt_method", translate("Encrypt Method"))
 for a, t in ipairs(ss_encrypt_method_list) do ss_encrypt_method:value(t) end
@@ -263,11 +313,13 @@ end
 
 security = s:option(ListValue, "security", translate("Encrypt Method"))
 for a, t in ipairs(security_list) do security:value(t) end
-security:depends("protocol", "vmess")
+security:depends({ type = "Xray", protocol = "vmess" })
+security:depends({ type = "V2ray", protocol = "vmess" })
 
 encryption = s:option(Value, "encryption", translate("Encrypt Method"))
 encryption.default = "none"
-encryption:depends("protocol", "vless")
+encryption:depends({ type = "Xray", protocol = "vless" })
+encryption:depends({ type = "V2ray", protocol = "vless" })
 
 v_ss_encrypt_method = s:option(ListValue, "v_ss_encrypt_method", translate("Encrypt Method"))
 for a, t in ipairs(v_ss_encrypt_method_list) do v_ss_encrypt_method:value(t) end
@@ -277,16 +329,6 @@ function v_ss_encrypt_method.cfgvalue(self, section)
 end
 function v_ss_encrypt_method.write(self, section, value)
 	m:set(section, "method", value)
-end
-
-ss_ota = s:option(Flag, "ss_ota", translate("OTA"), translate("When OTA is enabled, V2Ray will reject connections that are not OTA enabled. This option is invalid when using AEAD encryption."))
-ss_ota.default = "0"
-ss_ota:depends("protocol", "shadowsocks")
-function ss_ota.cfgvalue(self, section)
-	return m:get(section, "ota")
-end
-function ss_ota.write(self, section, value)
-	m:set(section, "ota", value)
 end
 
 ssr_protocol = s:option(ListValue, "ssr_protocol", translate("Protocol"))
@@ -367,57 +409,87 @@ kcp_opts:depends("use_kcp", "1")
 
 uuid = s:option(Value, "uuid", translate("ID"))
 uuid.password = true
-uuid:depends("protocol", "vmess")
-uuid:depends("protocol", "vless")
+uuid:depends({ type = "Xray", protocol = "vmess" })
+uuid:depends({ type = "Xray", protocol = "vless" })
+uuid:depends({ type = "V2ray", protocol = "vmess" })
+uuid:depends({ type = "V2ray", protocol = "vless" })
 
 alter_id = s:option(Value, "alter_id", translate("Alter ID"))
 alter_id:depends("protocol", "vmess")
 
 level = s:option(Value, "level", translate("User Level"))
 level.default = 1
-level:depends("protocol", "vmess")
-level:depends("protocol", "vless")
+level:depends({ type = "Xray", protocol = "vmess" })
+level:depends({ type = "Xray", protocol = "vless" })
+level:depends({ type = "Xray", protocol = "trojan" })
+level:depends({ type = "V2ray", protocol = "vmess" })
+level:depends({ type = "V2ray", protocol = "vless" })
+level:depends({ type = "V2ray", protocol = "trojan" })
 
-stream_security = s:option(ListValue, "stream_security", translate("Transport Layer Encryption"), translate('Whether or not transport layer encryption is enabled, the supported options are "none" for unencrypted and "TLS" for using TLS.'))
-stream_security:value("none", "none")
-stream_security:value("tls", "tls")
-stream_security.default = "tls"
-stream_security:depends("protocol", "vmess")
-stream_security:depends("protocol", "vless")
-stream_security:depends("protocol", "socks")
-stream_security:depends("protocol", "shadowsocks")
-stream_security:depends("type", "Trojan")
-stream_security:depends("type", "Trojan-Plus")
-stream_security:depends("type", "Trojan-Go")
-stream_security.validate = function(self, value)
-    if value == "none" and (type:formvalue(arg[1]) == "Trojan" or type:formvalue(arg[1]) == "Trojan-Plus") then
-        return nil, translate("'none' not supported for original Trojan, please choose 'tls'.")
+tls = s:option(Flag, "tls", translate("TLS"))
+tls.default = 0
+tls.validate = function(self, value, t)
+    if value then
+        local type = type:formvalue(t) or ""
+        if value == "0" and (type == "Trojan" or type == "Trojan-Plus") then
+            return nil, translate("Original Trojan only supported 'tls', please choose 'tls'.")
+        end
+        return value
     end
-    return value
 end
+tls:depends({ type = "Xray", protocol = "vmess" })
+tls:depends({ type = "Xray", protocol = "vless" })
+tls:depends({ type = "Xray", protocol = "socks" })
+tls:depends({ type = "Xray", protocol = "trojan" })
+tls:depends({ type = "Xray", protocol = "shadowsocks" })
+tls:depends({ type = "V2ray", protocol = "vmess" })
+tls:depends({ type = "V2ray", protocol = "vless" })
+tls:depends({ type = "V2ray", protocol = "socks" })
+tls:depends({ type = "V2ray", protocol = "shadowsocks" })
+tls:depends({ type = "Xray", protocol = "trojan" })
+tls:depends("type", "Trojan")
+tls:depends("type", "Trojan-Plus")
+tls:depends("type", "Trojan-Go")
+
+xtls = s:option(Flag, "xtls", translate("XTLS"))
+xtls.default = 0
+xtls:depends({ type = "Xray", protocol = "vless", tls = "1" })
+
+flow = s:option(Value, "flow", translate("flow"))
+flow:value("xtls-rprx-origin")
+flow:value("xtls-rprx-origin-udp443")
+flow:value("xtls-rprx-direct")
+flow:value("xtls-rprx-direct-udp443")
+flow:value("xtls-rprx-splice")
+flow:value("xtls-rprx-splice-udp443")
+flow:depends("xtls", "1")
 
 -- [[ TLS部分 ]] --
 tls_sessionTicket = s:option(Flag, "tls_sessionTicket", translate("Session Ticket"))
 tls_sessionTicket.default = "0"
-tls_sessionTicket:depends("stream_security", "tls")
+tls_sessionTicket:depends({ type = "Trojan", tls = "1" })
+tls_sessionTicket:depends({ type = "Trojan-Plus", tls = "1" })
+tls_sessionTicket:depends({ type = "Trojan-Go", tls = "1" })
 
 -- [[ Trojan TLS ]]--
 trojan_force_fp = s:option(ListValue, "fingerprint", translate("Finger Print"))
 for a, t in ipairs(force_fp) do trojan_force_fp:value(t) end
 trojan_force_fp.default = "firefox"
-trojan_force_fp:depends({ type = "Trojan-Go", stream_security = "tls" })
+trojan_force_fp:depends({ type = "Trojan-Go", tls = "1" })
 
 tls_serverName = s:option(Value, "tls_serverName", translate("Domain"))
-tls_serverName:depends("stream_security", "tls")
+tls_serverName:depends("tls", "1")
+tls_serverName:depends("xtls", "1")
 
 tls_allowInsecure = s:option(Flag, "tls_allowInsecure", translate("allowInsecure"), translate("Whether unsafe connections are allowed. When checked, Certificate validation will be skipped."))
 tls_allowInsecure.default = "0"
-tls_allowInsecure:depends("stream_security", "tls")
+tls_allowInsecure:depends("tls", "1")
+tls_allowInsecure:depends("xtls", "1")
 
 -- [[ Trojan Cert ]]--
 trojan_cert_path = s:option(Value, "trojan_cert_path", translate("Trojan Cert Path"))
 trojan_cert_path.default = ""
-trojan_cert_path:depends({ stream_security = "tls", tls_allowInsecure = false })
+trojan_cert_path:depends({ tls = "1", tls_allowInsecure = false })
 
 trojan_transport = s:option(ListValue, "trojan_transport", translate("Transport"))
 trojan_transport:value("original", "Original")
@@ -432,7 +504,7 @@ trojan_plugin:value("plaintext", "Plain Text")
 trojan_plugin:value("shadowsocks", "ShadowSocks")
 trojan_plugin:value("other", "Other")
 trojan_plugin.default = "plaintext"
-trojan_plugin:depends({ stream_security = "none", trojan_transport = "original" })
+trojan_plugin:depends({ tls = "0", trojan_transport = "original" })
 
 trojan_plugin_cmd = s:option(Value, "plugin_cmd", translate("Plugin Binary"))
 trojan_plugin_cmd.placeholder = "eg: /usr/bin/v2ray-plugin"
@@ -456,17 +528,24 @@ transport:value("ws", "WebSocket")
 transport:value("h2", "HTTP/2")
 transport:value("ds", "DomainSocket")
 transport:value("quic", "QUIC")
-transport:depends("protocol", "vmess")
-transport:depends("protocol", "vless")
-transport:depends("protocol", "socks")
-transport:depends("protocol", "shadowsocks")
+transport:depends({ type = "Xray", protocol = "vmess" })
+transport:depends({ type = "Xray", protocol = "vless" })
+transport:depends({ type = "Xray", protocol = "socks" })
+transport:depends({ type = "Xray", protocol = "shadowsocks" })
+transport:depends({ type = "Xray", protocol = "trojan" })
+transport:depends({ type = "V2ray", protocol = "vmess" })
+transport:depends({ type = "V2ray", protocol = "vless" })
+transport:depends({ type = "V2ray", protocol = "socks" })
+transport:depends({ type = "V2ray", protocol = "shadowsocks" })
+transport:depends({ type = "V2ray", protocol = "trojan" })
 
 --[[
 ss_transport = s:option(ListValue, "ss_transport", translate("Transport"))
 ss_transport:value("ws", "WebSocket")
 ss_transport:value("h2", "HTTP/2")
 ss_transport:value("h2+ws", "HTTP/2 & WebSocket")
-ss_transport:depends("protocol", "shadowsocks")
+ss_transport:depends({ type = "Xray", protocol = "shadowsocks" })
+ss_transport:depends({ type = "V2ray", protocol = "shadowsocks" })
 ]]--
 
 -- [[ TCP部分 ]]--
@@ -548,7 +627,7 @@ h2_path:depends("trojan_transport", "h2+ws")
 h2_path:depends("trojan_transport", "h2")
 
 -- [[ DomainSocket部分 ]]--
-ds_path = s:option(Value, "ds_path", "Path", translate("A legal file path. This file must not exist before running V2Ray."))
+ds_path = s:option(Value, "ds_path", "Path", translate("A legal file path. This file must not exist before running."))
 ds_path:depends("transport", "ds")
 
 -- [[ QUIC部分 ]]--
@@ -581,6 +660,11 @@ ss_aead_pwd:depends("ss_aead", "1")
 
 -- [[ Mux ]]--
 mux = s:option(Flag, "mux", translate("Mux"))
+mux:depends({ type = "Xray", protocol = "vmess" })
+mux:depends({ type = "Xray", protocol = "vless", xtls = false })
+mux:depends({ type = "Xray", protocol = "http" })
+mux:depends({ type = "Xray", protocol = "socks" })
+mux:depends({ type = "Xray", protocol = "shadowsocks" })
 mux:depends({ type = "V2ray", protocol = "vmess" })
 mux:depends({ type = "V2ray", protocol = "vless" })
 mux:depends({ type = "V2ray", protocol = "http" })
@@ -596,6 +680,7 @@ mux_concurrency:depends("mux", "1")
 --[[
 tcp_socks = s:option(Flag, "tcp_socks", translate("TCP Open Socks"), translate("When using this TCP node, whether to open the socks proxy at the same time"))
 tcp_socks.default = 0
+tcp_socks:depends("type", "Xray")
 tcp_socks:depends("type", "V2ray")
 
 tcp_socks_port = s:option(Value, "tcp_socks_port", "Socks " .. translate("Port"), translate("Do not conflict with other ports"))

@@ -1,225 +1,160 @@
 #!/bin/sh
+. /usr/share/openclash/ruby.sh
 
-    #删除旧hosts配置
-    hostlen=$(sed -n '/hosts:/=' "$7" 2>/dev/null)
-    dnslen=$(sed -n '/dns:/=' "$7" 2>/dev/null)
-    dnsheadlen=$(expr "$dnslen" - 1)
-    if [ ! -z "$hostlen" ] && [ "$hostlen" -gt "$dnslen" ]; then
-       sed -i '/^ \{0,\}hosts:/,$d' "$7" 2>/dev/null
-	  elif [ ! -z "$hostlen" ]; then
-       sed -i '/##Custom HOSTS##/,/##Custom HOSTS END##/d' "$7" 2>/dev/null
-       if [ -z "$(awk '/^ {0,}hosts:/,/^dns:/{print}' "$7" 2>/dev/null |awk -F ':' '{print $2}' 2>/dev/null)" ]; then
-          sed -i "/${hostlen}p/,/${dnsheadlen}p/d" "$7" 2>/dev/null
-          sed -i '/^ \{0,\}hosts:/d' "$7" 2>/dev/null
-       fi
-	  fi
-	   
-    if [ -z "$(grep "^  enhanced-mode: $2" "$7")" ]; then
-       if [ ! -z "$(grep "^ \{0,\}enhanced-mode:" "$7")" ]; then
-          sed -i "/^ \{0,\}enhanced-mode:/c\  enhanced-mode: ${2}" "$7"
-       else
-          sed -i "/^dns:/a\  enhanced-mode: ${2}" "$7"
-       fi
-    fi
-    
-    if [ "$2" = "fake-ip" ]; then
-       if [ -z "$(grep "^ \{0,\}fake-ip-range: 198.18.0.1/16" "$7")" ]; then
-          if [ ! -z "$(grep "^ \{0,\}fake-ip-range:" "$7")" ]; then
-             sed -i "/^ \{0,\}fake-ip-range:/c\  fake-ip-range: 198.18.0.1/16" "$7"
-          else
-             sed -i "/^ \{0,\}enhanced-mode:/a\  fake-ip-range: 198.18.0.1/16" "$7"
-          fi
-       fi
-    else
-       sed -i '/^ \{0,\}fake-ip-range:/d' "$7" 2>/dev/null
-    fi
-    
-    sed -i '/##Custom DNS##/d' "$7" 2>/dev/null
+LOG_FILE="/tmp/openclash.log"
+START_LOG="/tmp/openclash_start.log"
+LOGTIME=$(date "+%Y-%m-%d %H:%M:%S")
 
+if [ "$14" != "1" ]; then
+   controller_address="0.0.0.0"
+   bind_address="*"
+else
+   controller_address=$11
+   bind_address=$11
+fi
 
-    if [ -z "$(grep "^redir-port: $6" "$7")" ]; then
-       if [ ! -z "$(grep "^ \{0,\}redir-port:" "$7")" ]; then
-          sed -i "/^ \{0,\}redir-port:/c\redir-port: ${6}" "$7"
-       else
-          sed -i "/^dns:/i\redir-port: ${6}" "$7"
-       fi
-    fi
-    
-    if [ -z "$(grep "^port: $9" "$7")" ]; then
-       if [ ! -z "$(grep "^ \{0,\}port:" "$7")" ]; then
-          sed -i "/^ \{0,\}port:/c\port: ${9}" "$7"
-       else
-          sed -i "/^dns:/i\port: ${9}" "$7"
-       fi
-    fi
-    
-    if [ -z "$(grep "^socks-port: $10" "$7")" ]; then
-       if [ ! -z "$(grep "^ \{0,\}socks-port:" "$7")" ]; then
-          sed -i "/^ \{0,\}socks-port:/c\socks-port: ${10}" "$7"
-       else
-          sed -i "/^dns:/i\socks-port: ${10}" "$7"
-       fi
-    fi
-    
-    if [ -z "$(grep "^mode: $13" "$7")" ]; then
-       if [ ! -z "$(grep "^ \{0,\}mode:" "$7")" ]; then
-          sed -i "/^ \{0,\}mode:/c\mode: ${13}" "$7"
-       else
-          sed -i "/^dns:/i\mode: ${13}" "$7"
-       fi
-    fi
-    
-    if [ -z "$(grep "^log-level: $12" "$7")" ]; then
-       if [ ! -z "$(grep "^ \{0,\}log-level:" "$7")" ]; then
-          sed -i "/^ \{0,\}log-level:/c\log-level: ${12}" "$7"
-       else
-          sed -i "/^dns:/i\log-level: ${12}" "$7"
-       fi
-    fi
-    
-    if [ "$14" -ne 1 ]; then
-       controller_address="0.0.0.0"
-       bind_address="*"
-    else
-       controller_address=$11
-       bind_address=$11
-    fi
-    
-    if [ -z "$(grep "^external-controller: $controller_address:$5" "$7")" ]; then
-       if [ ! -z "$(grep "^ \{0,\}external-controller:" "$7")" ]; then
-          sed -i "/^ \{0,\}external-controller:/c\external-controller: ${controller_address}:${5}" "$7"
-       else
-          sed -i "/^dns:/i\external-controller: ${controller_address}:${5}" "$7"
-       fi
-       uci set openclash.config.config_reload=0
-    fi
-    
-    if [ -z "$(grep "^secret: \"$4\"" "$7")" ]; then
-       if [ ! -z "$(grep "^ \{0,\}secret:" "$7")" ]; then
-          sed -i "/^ \{0,\}secret:/c\secret: \"${4}\"" "$7"
-       else
-          sed -i "/^dns:/i\secret: \"${4}\"" "$7"
-       fi
-       uci set openclash.config.config_reload=0
-    fi
-    
-    if [ -z "$(grep "^ \{0,\}device-url:" "$7")" ] && [ "$15" -eq 2 ]; then
-       uci set openclash.config.config_reload=0
-    elif [ -z "$(grep "^ \{0,\}tun:" "$7")" ] && [ -n "$15" ]; then
-       uci set openclash.config.config_reload=0
-    elif [ -n "$(grep "^ \{0,\}tun:" "$7")" ] && [ -z "$15" ]; then
-       uci set openclash.config.config_reload=0
-    elif [ -n "$(grep "^ \{0,\}device-url:" "$7")" ] && [ "$15" -eq 1 ]; then
-       uci set openclash.config.config_reload=0
-    elif [ -n "$(grep "^ \{0,\}device-url:" "$7")" ] && [ "$15" -eq 3 ]; then
-       uci set openclash.config.config_reload=0
-    fi
-    
-    uci commit openclash
-
-    if [ -z "$(grep "^   enable: true" "$7")" ]; then
-       if [ ! -z "$(grep "^ \{0,\}enable:" "$7")" ]; then
-          sed -i "/^ \{0,\}enable:/c\  enable: true" "$7"
-       else
-          sed -i "/^dns:/a\  enable: true" "$7"
-       fi
-    fi
-    
-    if [ -z "$(grep "^allow-lan: true" "$7")" ]; then
-       if [ ! -z "$(grep "^ \{0,\}allow-lan:" "$7")" ]; then
-          sed -i "/^ \{0,\}allow-lan:/c\allow-lan: true" "$7"
-       else
-          sed -i "/^dns:/i\allow-lan: true" "$7"
-       fi
-    fi
-    
-    sed -i '/bind-address:/d' "$7" 2>/dev/null
-    sed -i "/^allow-lan:/a\bind-address: \"${bind_address}\"" "$7"
-    
-    if [ -z "$(grep '^external-ui: "/usr/share/openclash/dashboard"' "$7")" ]; then
-       if [ ! -z "$(grep "^ \{0,\}external-ui:" "$7")" ]; then
-          sed -i '/^ \{0,\}external-ui:/c\external-ui: "/usr/share/openclash/dashboard"' "$7"
-       else
-          sed -i '/^dns:/i\external-ui: "/usr/share/openclash/dashboard"' "$7"
-       fi
-    fi
-
-    if [ "$8" -eq 1 ]; then
-       sed -i '/^ \{0,\}ipv6:/d' "$7" 2>/dev/null
-       sed -i "/^ \{0,\}enable: true/a\  ipv6: true" "$7"
-       sed -i "/^ \{0,\}mode:/i\ipv6: true" "$7"
-    else
-       sed -i '/^ \{0,\}ipv6:/d' "$7" 2>/dev/null
-       sed -i "/^ \{0,\}enable: true/a\  ipv6: false" "$7"
-       sed -i "/^ \{0,\}mode:/i\ipv6: false" "$7"
-    fi
-
-#TUN
-    if [ "$15" -eq 1 ] || [ "$15" -eq 3 ]; then
-       sed -i "/^dns:/i\tun:" "$7"
-       sed -i "/^dns:/i\  enable: true" "$7"
-       if [ -n "$16" ]; then
-          sed -i "/^dns:/i\  stack: ${16}" "$7"
-       else
-          sed -i "/^dns:/i\  stack: system" "$7"
-       fi
-       sed -i "/^dns:/i\  dns-hijack:" "$7"
-#       sed -i "/^dns:/i\  - 8.8.8.8:53" "$7"
-       sed -i "/^dns:/i\  - tcp://8.8.8.8:53" "$7"
-#       sed -i "/^dns:/i\  - 8.8.4.4:53" "$7"
-       sed -i "/^dns:/i\  - tcp://8.8.4.4:53" "$7"
-    elif [ "$15" -eq 2 ]; then
-       sed -i "/^dns:/i\tun:" "$7"
-       sed -i "/^dns:/i\  enable: true" "$7"
-       sed -i "/^dns:/i\  device-url: dev://clash0" "$7"
-       sed -i "/^dns:/i\  dns-listen: 0.0.0.0:53" "$7"
-    fi
-
-#添加自定义Hosts设置
-	   
-    if [ "$2" = "redir-host" ]; then
-	     if [ -z "$(grep "^ \{0,\}hosts:" $7)" ]; then
-	        sed -i '/^dns:/i\hosts:' "$7" 2>/dev/null
-   	   else
-	        if [ ! -z "$(grep "^ \{1,\}hosts:" $7)" ]; then
-	           sed -i "/^ \{0,\}hosts:/c\hosts:" "$7"
-	        fi
-	     fi
-	     if [ -z "$(grep "^ \{0,\}use-hosts:" $7)" ]; then
-	        sed -i "/^dns:/a\  use-hosts: true" "$7"
-   	   else
-	        if [ ! -z "$(grep "^ \{0,\}use-hosts:" $7)" ]; then
-	           sed -i "/^ \{0,\}use-hosts:/c\  use-hosts: true" "$7"
-	        fi
-	     fi
-	     sed -i '/^hosts:/a\##Custom HOSTS END##' "$7" 2>/dev/null
-	     sed -i '/^hosts:/a\##Custom HOSTS##' "$7" 2>/dev/null
-	     sed -i '/##Custom HOSTS##/r/etc/openclash/custom/openclash_custom_hosts.list' "$7" 2>/dev/null
-	     sed -i "/^hosts:/,/^dns:/ {s/^ \{0,\}'/  '/}" "$7" 2>/dev/null #修改参数空格
-	  fi
-	  
-	  sed -i "s/^ \{0,\}- /  - /" "$7" 2>/dev/null
-	  if [ ! -z "$(grep "^ \{0,\}default-nameserver:" "$7")" ]; then
-       sed -i "/^ \{0,\}default-nameserver:/c\  default-nameserver:" "$7"
-    fi
-    
-#fake-ip-filter
-    sed -i '/##Custom fake-ip-filter##/,/##Custom fake-ip-filter END##/d' "$7" 2>/dev/null
-	  if [ "$2" = "fake-ip" ]; then
-      if [ ! -f "/etc/openclash/fake_filter.list" ] || [ ! -z "$(grep "config servers" /etc/config/openclash)" ]; then
-         /usr/share/openclash/openclash_fake_filter.sh
+if [ -n "$(ruby_read "$7" "['tun']")" ]; then
+   if [ -n "$(ruby_read "$7" "['tun']['device-url']")" ]; then
+      if [ "$15" -eq 1 ] || [ "$15" -eq 3 ]; then
+         uci set openclash.config.config_reload=0
       fi
-      if [ -s "/etc/openclash/servers_fake_filter.conf" ]; then
-         mkdir -p /tmp/dnsmasq.d
-         ln -s /etc/openclash/servers_fake_filter.conf /tmp/dnsmasq.d/dnsmasq_openclash.conf
-      fi
-      if [ -s "/etc/openclash/fake_filter.list" ]; then
-      	if [ ! -z "$(grep "^ \{0,\}fake-ip-filter:" "$7")" ]; then
-      	   sed -i "/^ \{0,\}fake-ip-filter:/c\  fake-ip-filter:" "$7"
-      	   sed -i '/^ \{0,\}fake-ip-filter:/r/etc/openclash/fake_filter.list' "$7" 2>/dev/null
-      	else
-      	   echo "  fake-ip-filter:" >> "$7"
-      	   sed -i '/^ \{0,\}fake-ip-filter:/r/etc/openclash/fake_filter.list' "$7" 2>/dev/null
-        fi
-      fi
+   else
+      uci set openclash.config.config_reload=0
    fi
+else
+   if [ -n "$15" ]; then
+      uci set openclash.config.config_reload=0
+   fi
+fi
+
+if [ -z "$15" ]; then
+   en_mode_tun=0
+else
+   en_mode_tun=$15
+fi
+
+if [ -z "$16" ]; then
+   stack_type=system
+else
+   stack_type=$16
+fi
+
+if [ "$(ruby_read "$7" "['external-controller']")" != "$controller_address:$5" ]; then
+   uci set openclash.config.config_reload=0
+fi
+    
+if [ "$(ruby_read "$7" "['secret']")" != "$4" ]; then
+   uci set openclash.config.config_reload=0
+fi
+uci commit openclash
+
+if [ "$2" = "fake-ip" ]; then
+   if [ ! -f "/tmp/openclash_fake_filter.list" ] || [ ! -z "$(grep "config servers" /etc/config/openclash 2>/dev/null)" ]; then
+      /usr/share/openclash/openclash_fake_filter.sh
+   fi
+   if [ -s "/tmp/openclash_servers_fake_filter.conf" ]; then
+      mkdir -p /tmp/dnsmasq.d
+      ln -s /tmp/openclash_servers_fake_filter.conf /tmp/dnsmasq.d/dnsmasq_openclash.conf
+   fi
+fi
+
+ruby -ryaml -E UTF-8 -e "
+begin
+   Value = YAML.load_file('$7');
+rescue Exception => e
+puts '${LOGTIME} Load File Error: ' + e.message
+end
+begin
+Value['redir-port']=$6;
+Value['port']=$9;
+Value['socks-port']=$10;
+Value['mixed-port']=$19;
+Value['mode']='$13';
+Value['log-level']='$12';
+Value['allow-lan']=true;
+Value['external-controller']='$controller_address:$5';
+Value['secret']='$4';
+Value['bind-address']='$bind_address';
+Value['external-ui']='/usr/share/openclash/dashboard';
+if not Value.key?('dns') then
+   Value_1={'dns'=>{'enable'=>true}}
+   Value['dns']=Value_1['dns']
+else
+   Value['dns']['enable']=true
+end;
+if $8 == 1 then
+   Value['dns']['ipv6']=true
+   Value['ipv6']=true
+else
+   Value['dns']['ipv6']=false
+   Value['ipv6']=false
+end;
+Value['dns']['enhanced-mode']='$2';
+if '$2' == 'fake-ip' then
+   Value['dns']['fake-ip-range']='198.18.0.1/16'
+else
+   Value['dns'].delete('fake-ip-range')
+end;
+if $8 != 1 then
+   Value['dns']['listen']='127.0.0.1:$17'
+else
+   Value['dns']['listen']='0.0.0.0:$17'
+end;
+Value_2={'tun'=>{'enable'=>true}};
+if $en_mode_tun == 1 or $en_mode_tun == 3 then
+   Value['tun']=Value_2['tun']
+   Value['tun']['stack']='$stack_type'
+   Value_2={'dns-hijack'=>['tcp://8.8.8.8:53','tcp://8.8.4.4:53']}
+   Value['tun'].merge!(Value_2)
+elsif $en_mode_tun == 2
+   Value['tun']=Value_2['tun']
+   Value['tun']['device-url']='dev://clash0'
+   Value['tun']['dns-listen']='0.0.0.0:53'
+elsif $en_mode_tun == 0
+   if Value.key?('tun') then
+      Value['tun'].clear
+   end
+end;
+rescue Exception => e
+puts '${LOGTIME} Set General Error: ' + e.message
+end
+begin
+#添加自定义Hosts设置
+if '$2' == 'redir-host' then
+   if File::exist?('/etc/openclash/custom/openclash_custom_hosts.list') then
+      Value_3 = YAML.load_file('/etc/openclash/custom/openclash_custom_hosts.list')
+      if Value_3 != false then
+         Value['dns']['use-hosts']=true
+         if Value.has_key?('hosts') and not Value['hosts'].to_a.empty? then
+            Value['hosts'].merge!(Value_3)
+            Value['hosts'].uniq
+         else
+            Value['hosts']=Value_3
+         end
+      end
+   end
+end;
+rescue Exception => e
+puts '${LOGTIME} Set Hosts Rules Error: ' + e.message
+end
+begin
+#fake-ip-filter
+if '$2' == 'fake-ip' then
+   if File::exist?('/tmp/openclash_fake_filter.list') then
+     Value_4 = YAML.load_file('/tmp/openclash_fake_filter.list')
+     if Value_4 != false then
+        if Value['dns'].has_key?('fake-ip-filter') and not Value['dns']['fake-ip-filter'].to_a.empty? then
+           Value_5 = Value_4['fake-ip-filter'].reverse!
+           Value_5.each{|x| Value['dns']['fake-ip-filter'].insert(-1,x)}
+           Value['dns']['fake-ip-filter']=Value['dns']['fake-ip-filter'].uniq
+        else
+           Value['dns']['fake-ip-filter']=Value_4['fake-ip-filter']
+        end
+     end
+  end
+end;
+rescue Exception => e
+puts '${LOGTIME} Set Fake IP Filter Error: ' + e.message
+ensure
+File.open('$7','w') {|f| YAML.dump(Value, f)}
+end" 2>/dev/null >> $LOG_FILE

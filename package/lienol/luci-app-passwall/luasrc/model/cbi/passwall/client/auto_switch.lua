@@ -1,21 +1,14 @@
 local uci = require"luci.model.uci".cursor()
+local api = require "luci.model.cbi.passwall.api.api"
 local appname = "passwall"
 
 local nodes_table = {}
-uci:foreach(appname, "nodes", function(e)
-    if e.type and e.remarks then
-        local remarks = ""
-        if e.type == "V2ray" and (e.protocol == "_balancing" or e.protocol == "_shunt") then
-            remarks = "%s：[%s] " % {translatef(e.type .. e.protocol), e.remarks}
-        else
-            remarks = "%s：[%s] %s:%s" % {e.type, e.remarks, e.address, e.port}
-        end
-        nodes_table[#nodes_table + 1] = {
-            id = e[".name"],
-            remarks = remarks
-         }
-    end
-end)
+for k, e in ipairs(api.get_valid_nodes()) do
+    nodes_table[#nodes_table + 1] = {
+        id = e[".name"],
+        remarks = e.remarks_name
+    }
+end
 
 m = Map(appname)
 
@@ -46,6 +39,8 @@ for i = 1, tcp_node_num, 1 do
     for k, v in pairs(nodes_table) do
         o:value(v.id, v.remarks)
     end
+
+    o = s:option(Flag, "restore_switch" .. i, "TCP " .. i .. " " .. translate("Restore Switch"), translate("When detects main node is available, switch back to the main node."))
 end
 
 return m
